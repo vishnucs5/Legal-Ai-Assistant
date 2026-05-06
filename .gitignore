@@ -1,0 +1,11 @@
+.cache/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+.env
+.venv/
+htmlcov/
+.coverage
+*.log
+.tmp_functional/
+pytest-cache-files-*/

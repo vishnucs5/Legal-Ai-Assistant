@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["contract_id", "metadata", "clauses", "risk_summary", "executive_summary", "processing_meta"],
+  "properties": {
+    "contract_id": { "type": "string" },
+    "metadata": { "type": "object" },
+    "clauses": { "type": "array", "items": { "$ref": "clause_schema.json" } },
+    "risk_summary": { "type": "object" },
+    "executive_summary": { "type": "object" },
+    "processing_meta": { "type": "object" }
+  }
+}
+

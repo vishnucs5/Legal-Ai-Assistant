@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["clause_id", "clause_type", "verbatim_text", "party_bound", "risk_score"],
+  "properties": {
+    "clause_id": { "type": "string", "pattern": "^C\\d{3}$" },
+    "clause_type": { "type": "string" },
+    "heading": { "type": ["string", "null"] },
+    "verbatim_text": { "type": "string", "minLength": 10 },
+    "plain_english": { "type": "string" },
+    "party_bound": { "enum": ["party_a", "party_b", "both", "unspecified"] },
+    "obligations": { "type": "array", "items": { "type": "string" } },
+    "risk_score": { "type": "number", "minimum": 0, "maximum": 10 },
+    "risk_flags": { "type": "array", "items": { "type": "string" } },
+    "page_ref": { "type": ["integer", "null"] },
+    "chunk_id": { "type": "integer" }
+  }
+}
+

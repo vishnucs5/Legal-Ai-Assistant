@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["risk_id", "severity", "category", "affected_clause_ids", "plain_english_explanation", "recommended_action"],
+  "properties": {
+    "risk_id": { "type": "string" },
+    "severity": { "enum": ["critical", "high", "medium", "low", "info"] },
+    "category": { "enum": ["financial", "operational", "ip", "compliance", "relationship"] },
+    "affected_clause_ids": { "type": "array", "items": { "type": "string" } },
+    "plain_english_explanation": { "type": "string" },
+    "recommended_action": { "enum": ["negotiate", "escalate", "accept", "reject", "monitor"] },
+    "suggested_redline": { "type": ["string", "null"] }
+  }
+}
+
