@@ -9,3 +9,4 @@ htmlcov/
 *.log
 .tmp_functional/
 pytest-cache-files-*/
+.npm-cache/

@@ -9,4 +9,4 @@ htmlcov/
 .coverage
 .tmp_functional/
 pytest-cache-files-*/
-
+.npm-cache/
