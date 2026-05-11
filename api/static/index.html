@@ -22,9 +22,14 @@
           </div>
         </div>
         <aside class="input-panel" aria-label="Analysis controls">
+          <div class="mode-row" role="group" aria-label="Workspace mode">
+            <button id="mode-analyze" class="active" type="button">Analyze</button>
+            <button id="mode-compare" type="button">Compare</button>
+          </div>
+
           <label class="file-target" for="contract-file">
             <span>Upload</span>
-            <strong id="file-name">Contract file</strong>
+            <strong id="file-name">Primary contract</strong>
           </label>
           <input id="contract-file" type="file" accept=".txt,.html,.htm,.pdf,.docx" />
 
@@ -66,6 +71,19 @@
             <button id="sample-button" type="button" title="Load sample contract">Sample</button>
             <button id="analyze-button" type="button">Analyze</button>
           </div>
+
+          <div id="compare-inputs" class="secondary-input" hidden>
+            <label class="file-target" for="compare-file">
+              <span>Compare Against</span>
+              <strong id="compare-file-name">Revised contract</strong>
+            </label>
+            <input id="compare-file" type="file" accept=".txt,.html,.htm,.pdf,.docx" />
+
+            <label>
+              <span>Revised Text</span>
+              <textarea id="compare-text" rows="6" placeholder="Paste the revised version here"></textarea>
+            </label>
+          </div>
         </aside>
 
         <aside class="results-panel" aria-label="Analysis results">
@@ -82,11 +100,27 @@
               <strong id="missing-count">0</strong>
             </div>
           </div>
+          <div class="tool-row">
+            <input id="clause-search" placeholder="Search clauses" aria-label="Search clauses" />
+            <select id="risk-filter" aria-label="Filter by risk">
+              <option value="all">All risks</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+          <div class="export-row" aria-label="Export report">
+            <button id="export-json" type="button">JSON</button>
+            <button id="export-markdown" type="button">Markdown</button>
+            <button id="export-html" type="button">HTML</button>
+          </div>
+          <div id="compare-summary" class="compare-summary" hidden></div>
+          <div id="obligation-panel" class="obligation-panel" aria-label="Obligations by party"></div>
           <div id="clause-list" class="clause-list" aria-label="Detected clauses"></div>
         </aside>
       </section>
     </main>
     <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
-    <script src="/static/app.js?v=5"></script>
+    <script src="/static/app.js?v=6"></script>
   </body>
 </html>

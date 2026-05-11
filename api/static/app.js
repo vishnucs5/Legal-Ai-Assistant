@@ -6,14 +6,27 @@ const riskLevel = document.querySelector("#risk-level");
 const missingCount = document.querySelector("#missing-count");
 const summaryText = document.querySelector("#summary-text");
 const clauseList = document.querySelector("#clause-list");
+const obligationPanel = document.querySelector("#obligation-panel");
+const compareSummary = document.querySelector("#compare-summary");
 const fileInput = document.querySelector("#contract-file");
 const fileName = document.querySelector("#file-name");
+const compareFileInput = document.querySelector("#compare-file");
+const compareFileName = document.querySelector("#compare-file-name");
+const compareInputs = document.querySelector("#compare-inputs");
 const contractText = document.querySelector("#contract-text");
+const compareText = document.querySelector("#compare-text");
 const contractType = document.querySelector("#contract-type");
 const analysisDepth = document.querySelector("#analysis-depth");
 const jurisdiction = document.querySelector("#jurisdiction");
 const analyzeButton = document.querySelector("#analyze-button");
 const sampleButton = document.querySelector("#sample-button");
+const modeAnalyze = document.querySelector("#mode-analyze");
+const modeCompare = document.querySelector("#mode-compare");
+const clauseSearch = document.querySelector("#clause-search");
+const riskFilter = document.querySelector("#risk-filter");
+const exportJson = document.querySelector("#export-json");
+const exportMarkdown = document.querySelector("#export-markdown");
+const exportHtml = document.querySelector("#export-html");
 
 const sampleContract = `MUTUAL NON-DISCLOSURE AGREEMENT
 
@@ -31,6 +44,18 @@ Vendor's liability is uncapped for all claims and damages arising out of this Ag
 
 Automatic Renewal
 This Agreement will automatically renew for successive one year terms unless either party gives notice at least five days before renewal.`;
+
+const revisedSampleContract = `${sampleContract}
+
+Data Privacy
+Vendor shall comply with GDPR, CCPA, and all applicable data protection laws.`;
+
+const appState = {
+  mode: "analyze",
+  report: null,
+  compare: null,
+  selectedClauseId: null,
+};
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0x07100f, 18, 50);
@@ -106,7 +131,6 @@ for (let i = 0; i < 3; i += 1) {
 }
 
 let clauseMeshes = [];
-let selectedClauseId = null;
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
@@ -164,7 +188,36 @@ function formatType(type) {
   return String(type || "clause").replaceAll("_", " ");
 }
 
+function escapeHtml(value) {
+  return String(value || "").replace(/[&<>"']/g, (char) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[char]
+  ));
+}
+
+function filteredClauses() {
+  const clauses = appState.report?.clauses || [];
+  const query = clauseSearch.value.trim().toLowerCase();
+  const risk = riskFilter.value;
+  return clauses.filter((clause) => {
+    const scoreClass = riskClass(clause.risk_score);
+    const haystack = [
+      clause.clause_id,
+      clause.clause_type,
+      clause.heading,
+      clause.plain_english,
+      clause.verbatim_text,
+      ...(clause.risk_flags || []),
+      ...(clause.obligations || []),
+    ].join(" ").toLowerCase();
+    return (risk === "all" || risk === scoreClass) && (!query || haystack.includes(query));
+  });
+}
+
 function renderReport(report) {
+  appState.report = report;
+  appState.compare = null;
+  compareSummary.hidden = true;
+
   const clauses = report.clauses || [];
   const summary = report.risk_summary || {};
   const executive = report.executive_summary || {};
@@ -175,6 +228,14 @@ function renderReport(report) {
   missingCount.textContent = String((summary.missing_clauses || []).length);
   summaryText.textContent = executive.one_paragraph || "No summary returned.";
 
+  appState.selectedClauseId = clauses[0]?.clause_id || null;
+  populateScene(clauses);
+  renderClauseList();
+  renderObligations();
+}
+
+function renderClauseList() {
+  const clauses = filteredClauses();
   clauseList.replaceChildren();
   for (const clause of clauses) {
     const button = document.createElement("button");
@@ -183,37 +244,145 @@ function renderReport(report) {
     button.dataset.clauseId = clause.clause_id;
     button.innerHTML = `
       <header>
-        <h2>${clause.clause_id} · ${formatType(clause.clause_type)}</h2>
+        <h2>${escapeHtml(clause.clause_id)} - ${escapeHtml(formatType(clause.clause_type))}</h2>
         <span class="score ${riskClass(clause.risk_score)}">${Number(clause.risk_score || 0).toFixed(1)}</span>
       </header>
-      <p>${clause.plain_english || clause.verbatim_text || ""}</p>
+      <p>${escapeHtml(clause.plain_english || clause.verbatim_text || "")}</p>
     `;
     button.addEventListener("click", () => selectClause(clause.clause_id));
     clauseList.append(button);
   }
-
-  selectedClauseId = clauses[0]?.clause_id || null;
-  populateScene(clauses);
+  if (!clauses.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = appState.report ? "No clauses match the current filters." : "Run analysis to see clauses.";
+    clauseList.append(empty);
+  }
   syncSelection();
+}
+
+function renderObligations() {
+  const clauses = appState.report?.clauses || [];
+  const grouped = new Map();
+  for (const clause of clauses) {
+    for (const obligation of clause.obligations || []) {
+      const key = clause.party_bound || "unspecified";
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push({ clauseId: clause.clause_id, text: obligation });
+    }
+  }
+
+  obligationPanel.replaceChildren();
+  const title = document.createElement("h2");
+  title.textContent = "Obligations";
+  obligationPanel.append(title);
+
+  if (!grouped.size) {
+    const empty = document.createElement("p");
+    empty.textContent = "No explicit obligations detected yet.";
+    obligationPanel.append(empty);
+    return;
+  }
+
+  for (const [party, items] of grouped.entries()) {
+    const group = document.createElement("section");
+    group.innerHTML = `<h3>${escapeHtml(formatType(party))}</h3>`;
+    const list = document.createElement("ul");
+    for (const item of items.slice(0, 5)) {
+      const li = document.createElement("li");
+      li.textContent = `${item.clauseId}: ${item.text}`;
+      list.append(li);
+    }
+    group.append(list);
+    obligationPanel.append(group);
+  }
+}
+
+function renderCompare(result) {
+  appState.compare = result;
+  appState.report = null;
+  resetScene();
+  clauseList.replaceChildren();
+  obligationPanel.replaceChildren();
+  compareSummary.hidden = false;
+
+  const added = result.added_clause_types || [];
+  const deleted = result.deleted_clause_types || [];
+  const changed = result.changed_clauses || [];
+  const vectors = result.new_risk_vectors || [];
+  const total = added.length + deleted.length + changed.length;
+
+  clauseCount.textContent = `${total} changes`;
+  riskScore.textContent = `${vectors.length} new risks`;
+  riskLevel.textContent = vectors.length ? "Review" : "Stable";
+  missingCount.textContent = String(deleted.length);
+  summaryText.textContent = total
+    ? "Comparison complete. Review added, deleted, and changed clause types before sending the revised contract."
+    : "Comparison complete. No clause-level changes were detected.";
+
+  compareSummary.innerHTML = `
+    <div><span>Added</span><strong>${added.length}</strong></div>
+    <div><span>Deleted</span><strong>${deleted.length}</strong></div>
+    <div><span>Changed</span><strong>${changed.length}</strong></div>
+  `;
+
+  const rows = [
+    ...added.map((type) => ({ label: "Added", type, score: 4.5 })),
+    ...deleted.map((type) => ({ label: "Deleted", type, score: 5.5 })),
+    ...changed.map((item) => ({ label: "Changed", type: item.clause_type, score: item.risk_delta > 0 ? 6.5 : 3.5, delta: item.risk_delta })),
+  ];
+
+  populateScene(rows.map((row, index) => ({
+    clause_id: `D${String(index + 1).padStart(3, "0")}`,
+    clause_type: row.type,
+    risk_score: row.score,
+    plain_english: `${row.label}: ${formatType(row.type)}${row.delta !== undefined ? `, risk delta ${row.delta}` : ""}`,
+  })));
+
+  for (const row of rows) {
+    const card = document.createElement("button");
+    card.className = "clause-card";
+    card.type = "button";
+    card.innerHTML = `
+      <header>
+        <h2>${escapeHtml(row.label)} - ${escapeHtml(formatType(row.type))}</h2>
+        <span class="score ${riskClass(row.score)}">${row.delta !== undefined ? escapeHtml(row.delta) : row.score.toFixed(1)}</span>
+      </header>
+      <p>${escapeHtml(row.delta !== undefined ? `Risk delta: ${row.delta}` : "Clause presence changed between versions.")}</p>
+    `;
+    clauseList.append(card);
+  }
 }
 
 function syncSelection() {
   document.querySelectorAll(".clause-card").forEach((card) => {
-    card.classList.toggle("active", card.dataset.clauseId === selectedClauseId);
+    card.classList.toggle("active", card.dataset.clauseId === appState.selectedClauseId);
   });
   for (const mesh of clauseMeshes) {
-    const active = mesh.userData.clause.clause_id === selectedClauseId;
+    const active = mesh.userData.clause.clause_id === appState.selectedClauseId;
     mesh.scale.set(active ? 1.22 : 1, active ? 1.1 : 1, active ? 1.22 : 1);
     mesh.material.emissiveIntensity = active ? 0.45 : 0.12;
   }
 }
 
 function selectClause(clauseId) {
-  selectedClauseId = clauseId;
+  appState.selectedClauseId = clauseId;
   syncSelection();
   const mesh = clauseMeshes.find((item) => item.userData.clause.clause_id === clauseId);
   if (mesh) {
     cameraRig.targetGoal.set(mesh.position.x, mesh.position.y, mesh.position.z);
+  }
+}
+
+function textFileFromTextarea(textarea, filename) {
+  return new File([textarea.value.trim() || sampleContract], filename, { type: "text/plain" });
+}
+
+function appendContractFile(formData, fieldName, fileInputElement, textAreaElement, fallbackName) {
+  if (fileInputElement.files[0]) {
+    formData.append(fieldName, fileInputElement.files[0]);
+  } else {
+    formData.append(fieldName, textFileFromTextarea(textAreaElement, fallbackName));
   }
 }
 
@@ -222,20 +391,14 @@ async function analyzeContract() {
   analyzeButton.disabled = true;
   try {
     const formData = new FormData();
-    if (fileInput.files[0]) {
-      formData.append("file", fileInput.files[0]);
-    } else {
-      const text = contractText.value.trim() || sampleContract;
-      formData.append("file", new File([text], "pasted-contract.txt", { type: "text/plain" }));
-    }
+    appendContractFile(formData, "file", fileInput, contractText, "pasted-contract.txt");
     formData.append("contract_type", contractType.value);
     formData.append("depth", analysisDepth.value);
     formData.append("jurisdiction", jurisdiction.value);
 
     const response = await fetch("/analyze", { method: "POST", body: formData });
     if (!response.ok) throw new Error(`Analyze failed with ${response.status}`);
-    const report = await response.json();
-    renderReport(report);
+    renderReport(await response.json());
     setStatus("Complete");
   } catch (error) {
     setStatus("Error");
@@ -245,19 +408,116 @@ async function analyzeContract() {
   }
 }
 
+async function compareContracts() {
+  setStatus("Comparing");
+  analyzeButton.disabled = true;
+  try {
+    const formData = new FormData();
+    appendContractFile(formData, "old_file", fileInput, contractText, "original-contract.txt");
+    appendContractFile(formData, "new_file", compareFileInput, compareText, "revised-contract.txt");
+    formData.append("contract_type", contractType.value);
+    formData.append("jurisdiction", jurisdiction.value);
+
+    const response = await fetch("/compare", { method: "POST", body: formData });
+    if (!response.ok) throw new Error(`Compare failed with ${response.status}`);
+    renderCompare(await response.json());
+    setStatus("Complete");
+  } catch (error) {
+    setStatus("Error");
+    summaryText.textContent = error.message || "Comparison failed.";
+  } finally {
+    analyzeButton.disabled = false;
+  }
+}
+
 function loadSample() {
   fileInput.value = "";
+  compareFileInput.value = "";
   fileName.textContent = "Pasted sample";
+  compareFileName.textContent = "Revised sample";
   contractText.value = sampleContract;
+  compareText.value = revisedSampleContract;
   contractType.value = "nda";
   jurisdiction.value = "New York";
 }
 
+function setMode(mode) {
+  appState.mode = mode;
+  const isCompare = mode === "compare";
+  modeAnalyze.classList.toggle("active", !isCompare);
+  modeCompare.classList.toggle("active", isCompare);
+  compareInputs.hidden = !isCompare;
+  analyzeButton.textContent = isCompare ? "Compare" : "Analyze";
+  setStatus(isCompare ? "Compare" : "Ready");
+}
+
+function toMarkdown(report) {
+  const risks = report.risk_summary?.risks || [];
+  const clauses = report.clauses || [];
+  return [
+    `# Contract Analysis: ${report.metadata?.filename || "contract"}`,
+    "",
+    report.executive_summary?.one_paragraph || "",
+    "",
+    "## Risks",
+    ...risks.map((risk) => `- **${String(risk.severity || "").toUpperCase()}** (${risk.category}): ${risk.plain_english_explanation}`),
+    "",
+    "## Clauses",
+    ...clauses.map((clause) => `- ${clause.clause_id} **${formatType(clause.clause_type)}** risk ${clause.risk_score}/10`),
+  ].join("\n");
+}
+
+function toHtml(report) {
+  const risks = (report.risk_summary?.risks || []).map((risk) => `<li><strong>${escapeHtml(risk.severity)}</strong>: ${escapeHtml(risk.plain_english_explanation)}</li>`).join("");
+  const clauses = (report.clauses || []).map((clause) => `<li>${escapeHtml(clause.clause_id)}: ${escapeHtml(formatType(clause.clause_type))} (${escapeHtml(clause.risk_score)}/10)</li>`).join("");
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Contract Analysis</title></head><body><h1>${escapeHtml(report.metadata?.filename || "Contract Analysis")}</h1><p>${escapeHtml(report.executive_summary?.one_paragraph || "")}</p><h2>Risks</h2><ul>${risks}</ul><h2>Clauses</h2><ul>${clauses}</ul></body></html>`;
+}
+
+function downloadReport(format) {
+  if (!appState.report) {
+    setStatus("No report");
+    return;
+  }
+  const data = {
+    json: JSON.stringify(appState.report, null, 2),
+    markdown: toMarkdown(appState.report),
+    html: toHtml(appState.report),
+  }[format];
+  const type = {
+    json: "application/json",
+    markdown: "text/markdown",
+    html: "text/html",
+  }[format];
+  const extension = { json: "json", markdown: "md", html: "html" }[format];
+  const url = URL.createObjectURL(new Blob([data], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `contract-analysis.${extension}`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 fileInput.addEventListener("change", () => {
-  fileName.textContent = fileInput.files[0]?.name || "Contract file";
+  fileName.textContent = fileInput.files[0]?.name || "Primary contract";
+});
+compareFileInput.addEventListener("change", () => {
+  compareFileName.textContent = compareFileInput.files[0]?.name || "Revised contract";
 });
 sampleButton.addEventListener("click", loadSample);
-analyzeButton.addEventListener("click", analyzeContract);
+analyzeButton.addEventListener("click", () => {
+  if (appState.mode === "compare") {
+    compareContracts();
+  } else {
+    analyzeContract();
+  }
+});
+modeAnalyze.addEventListener("click", () => setMode("analyze"));
+modeCompare.addEventListener("click", () => setMode("compare"));
+clauseSearch.addEventListener("input", renderClauseList);
+riskFilter.addEventListener("change", renderClauseList);
+exportJson.addEventListener("click", () => downloadReport("json"));
+exportMarkdown.addEventListener("click", () => downloadReport("markdown"));
+exportHtml.addEventListener("click", () => downloadReport("html"));
 
 canvas.addEventListener("pointermove", (event) => {
   pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -274,6 +534,11 @@ canvas.addEventListener("pointerdown", (event) => {
   dragging = true;
   lastPointer = { x: event.clientX, y: event.clientY };
   canvas.setPointerCapture(event.pointerId);
+  pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+  pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hit = raycaster.intersectObjects(clauseMeshes)[0];
+  if (hit) selectClause(hit.object.userData.clause.clause_id);
 });
 
 canvas.addEventListener("pointerup", (event) => {
@@ -299,14 +564,6 @@ canvas.addEventListener("wheel", (event) => {
   cameraRig.radius += Math.sign(event.deltaY) * 1.2;
 }, { passive: false });
 
-canvas.addEventListener("pointerdown", (event) => {
-  pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-  pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  raycaster.setFromCamera(pointer, camera);
-  const hit = raycaster.intersectObjects(clauseMeshes)[0];
-  if (hit) selectClause(hit.object.userData.clause.clause_id);
-});
-
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -327,6 +584,7 @@ function animate(time = 0) {
 }
 
 loadSample();
+setMode("analyze");
 populateScene([
   { clause_id: "C001", clause_type: "confidentiality", risk_score: 2.0, plain_english: "Mutual confidentiality obligations." },
   { clause_id: "C002", clause_type: "termination", risk_score: 2.0, plain_english: "Thirty day termination notice." },

@@ -118,7 +118,9 @@ h1 {
 .input-panel {
   left: 18px;
   top: 110px;
+  bottom: 18px;
   width: min(340px, calc(100vw - 36px));
+  overflow: auto;
   padding: 14px;
 }
 
@@ -126,10 +128,11 @@ h1 {
   right: 18px;
   top: 110px;
   bottom: 18px;
-  width: min(390px, calc(100vw - 36px));
+  width: min(430px, calc(100vw - 36px));
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto auto auto auto auto 1fr;
   gap: 12px;
+  overflow: hidden;
   padding: 14px;
 }
 
@@ -167,6 +170,14 @@ label span,
   width: 1px;
 }
 
+#compare-file {
+  position: absolute;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+}
+
 textarea,
 input,
 select {
@@ -192,32 +203,64 @@ select:focus {
 
 .control-grid,
 .button-row,
+.tool-row,
+.export-row,
+.compare-summary,
 .risk-band {
   display: grid;
   gap: 10px;
   grid-template-columns: 1fr 1fr;
 }
 
-.button-row button {
+.mode-row {
+  border: 1px solid var(--line);
+  display: grid;
+  gap: 0;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 12px;
+}
+
+.button-row button,
+.mode-row button,
+.export-row button {
   border: 0;
-  color: var(--ink);
   cursor: pointer;
   font-weight: 900;
   min-height: 42px;
 }
 
+.mode-row button,
+.export-row button {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.mode-row button.active {
+  background: var(--teal);
+  color: var(--ink);
+}
+
 #sample-button {
   background: var(--lime);
+  color: var(--ink);
 }
 
 #analyze-button {
   background: var(--teal);
+  color: var(--ink);
 }
 
-.button-row button:disabled {
+.button-row button:disabled,
+.export-row button:disabled {
   cursor: wait;
   filter: grayscale(0.5);
   opacity: 0.72;
+}
+
+.secondary-input {
+  border-top: 1px solid var(--line);
+  margin-top: 14px;
+  padding-top: 14px;
 }
 
 .summary-band {
@@ -238,6 +281,78 @@ select:focus {
   display: block;
   font-size: 1.2rem;
   margin-top: 3px;
+}
+
+.tool-row {
+  grid-template-columns: 1.4fr 0.8fr;
+}
+
+.export-row {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.compare-summary {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.compare-summary div,
+.obligation-panel {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.compare-summary div {
+  padding: 10px;
+}
+
+.compare-summary span {
+  color: var(--muted);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.compare-summary strong {
+  display: block;
+  font-size: 1.25rem;
+  margin-top: 2px;
+}
+
+.obligation-panel {
+  max-height: 168px;
+  overflow: auto;
+  padding: 12px;
+}
+
+.obligation-panel h2,
+.obligation-panel h3 {
+  margin: 0;
+}
+
+.obligation-panel h2 {
+  font-size: 0.88rem;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.obligation-panel h3 {
+  color: var(--teal);
+  font-size: 0.82rem;
+  margin: 8px 0 5px;
+}
+
+.obligation-panel p,
+.obligation-panel li,
+.empty-state {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.obligation-panel ul {
+  margin: 0;
+  padding-left: 18px;
 }
 
 .clause-list {
@@ -337,11 +452,13 @@ select:focus {
 
   .input-panel {
     top: 142px;
+    bottom: auto;
+    max-height: 430px;
   }
 
   .results-panel {
     bottom: auto;
-    top: 590px;
-    max-height: 580px;
+    top: 600px;
+    max-height: 620px;
   }
 }
